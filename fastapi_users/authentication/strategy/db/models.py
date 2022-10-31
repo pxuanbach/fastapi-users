@@ -1,24 +1,22 @@
-import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TypeVar
 
-if sys.version_info < (3, 8):
-    from typing_extensions import Protocol  # pragma: no cover
-else:
-    from typing import Protocol  # pragma: no cover
-
-from fastapi_users import models
+from pydantic import UUID4, BaseModel, Field
 
 
-class AccessTokenProtocol(Protocol[models.ID]):
-    """Access token protocol that ORM model should follow."""
+def now_utc():
+    return datetime.now(timezone.utc)
+
+
+class BaseAccessToken(BaseModel):
+    """Base access token model."""
 
     token: str
-    user_id: models.ID
-    created_at: datetime
+    user_id: UUID4
+    created_at: datetime = Field(default_factory=now_utc)
 
-    def __init__(self, *args, **kwargs) -> None:
-        ...  # pragma: no cover
+    class Config:
+        orm_mode = True
 
 
-AP = TypeVar("AP", bound=AccessTokenProtocol)
+A = TypeVar("A", bound=BaseAccessToken)

@@ -2,7 +2,7 @@ from typing import Generic, Sequence, Type
 
 from fastapi import APIRouter
 
-from fastapi_users import models, schemas
+from fastapi_users import models
 from fastapi_users.authentication import AuthenticationBackend, Authenticator
 from fastapi_users.jwt import SecretType
 from fastapi_users.manager import UserManagerDependency
@@ -18,54 +18,62 @@ try:
     from httpx_oauth.oauth2 import BaseOAuth2
 
     from fastapi_users.router import get_oauth_router
-    from fastapi_users.router.oauth import get_oauth_associate_router
 except ModuleNotFoundError:  # pragma: no cover
     BaseOAuth2 = Type  # type: ignore
 
 
-class FastAPIUsers(Generic[models.UP, models.ID]):
+class FastAPIUsers(Generic[models.U, models.UC, models.UU, models.UD]):
     """
     Main object that ties together the component for users authentication.
 
     :param get_user_manager: Dependency callable getter to inject the
     user manager class instance.
     :param auth_backends: List of authentication backends.
+    :param user_model: Pydantic model of a user.
+    :param user_create_model: Pydantic model for creating a user.
+    :param user_update_model: Pydantic model for updating a user.
+    :param user_db_model: Pydantic model of a DB representation of a user.
 
     :attribute current_user: Dependency callable getter to inject authenticated user
     with a specific set of parameters.
     """
 
     authenticator: Authenticator
+    _user_model: Type[models.U]
+    _user_create_model: Type[models.UC]
+    _user_update_model: Type[models.UU]
+    _user_db_model: Type[models.UD]
 
     def __init__(
         self,
-        get_user_manager: UserManagerDependency[models.UP, models.ID],
+        get_user_manager: UserManagerDependency[models.UC, models.UD],
         auth_backends: Sequence[AuthenticationBackend],
+        user_model: Type[models.U],
+        user_create_model: Type[models.UC],
+        user_update_model: Type[models.UU],
+        user_db_model: Type[models.UD],
     ):
         self.authenticator = Authenticator(auth_backends, get_user_manager)
+
+        self._user_model = user_model
+        self._user_db_model = user_db_model
+        self._user_create_model = user_create_model
+        self._user_update_model = user_update_model
+
         self.get_user_manager = get_user_manager
         self.current_user = self.authenticator.current_user
 
-    def get_register_router(
-        self, user_schema: Type[schemas.U], user_create_schema: Type[schemas.UC]
-    ) -> APIRouter:
-        """
-        Return a router with a register route.
-
-        :param user_schema: Pydantic schema of a public user.
-        :param user_create_schema: Pydantic schema for creating a user.
-        """
+    def get_register_router(self) -> APIRouter:
+        """Return a router with a register route."""
         return get_register_router(
-            self.get_user_manager, user_schema, user_create_schema
+            self.get_user_manager,
+            self._user_model,
+            self._user_create_model,
         )
 
-    def get_verify_router(self, user_schema: Type[schemas.U]) -> APIRouter:
-        """
-        Return a router with e-mail verification routes.
-
-        :param user_schema: Pydantic schema of a public user.
-        """
-        return get_verify_router(self.get_user_manager, user_schema)
+    def get_verify_router(self) -> APIRouter:
+        """Return a router with e-mail verification routes."""
+        return get_verify_router(self.get_user_manager, self._user_model)
 
     def get_reset_password_router(self) -> APIRouter:
         """Return a reset password process router."""
@@ -79,7 +87,7 @@ class FastAPIUsers(Generic[models.UP, models.ID]):
 
         :param backend: The authentication backend instance.
         :param requires_verification: Whether the authentication
-        require the user to be verified or not. Defaults to False.
+        require the user to be verified or not.
         """
         return get_auth_router(
             backend,
@@ -94,7 +102,6 @@ class FastAPIUsers(Generic[models.UP, models.ID]):
         backend: AuthenticationBackend,
         state_secret: SecretType,
         redirect_url: str = None,
-        associate_by_email: bool = False,
     ) -> APIRouter:
         """
         Return an OAuth router for a given OAuth client and authentication backend.
@@ -104,8 +111,6 @@ class FastAPIUsers(Generic[models.UP, models.ID]):
         :param state_secret: Secret used to encode the state JWT.
         :param redirect_url: Optional arbitrary redirect URL for the OAuth2 flow.
         If not given, the URL to the callback endpoint will be generated.
-        :param associate_by_email: If True, any existing user with the same
-        e-mail address will be associated to this user. Defaults to False.
         """
         return get_oauth_router(
             oauth_client,
@@ -113,56 +118,23 @@ class FastAPIUsers(Generic[models.UP, models.ID]):
             self.get_user_manager,
             state_secret,
             redirect_url,
-            associate_by_email,
-        )
-
-    def get_oauth_associate_router(
-        self,
-        oauth_client: BaseOAuth2,
-        user_schema: Type[schemas.U],
-        state_secret: SecretType,
-        redirect_url: str = None,
-        requires_verification: bool = False,
-    ) -> APIRouter:
-        """
-        Return an OAuth association router for a given OAuth client.
-
-        :param oauth_client: The HTTPX OAuth client instance.
-        :param user_schema: Pydantic schema of a public user.
-        :param state_secret: Secret used to encode the state JWT.
-        :param redirect_url: Optional arbitrary redirect URL for the OAuth2 flow.
-        If not given, the URL to the callback endpoint will be generated.
-        :param requires_verification: Whether the endpoints
-        require the users to be verified or not. Defaults to False.
-        """
-        return get_oauth_associate_router(
-            oauth_client,
-            self.authenticator,
-            self.get_user_manager,
-            user_schema,
-            state_secret,
-            redirect_url,
-            requires_verification,
         )
 
     def get_users_router(
         self,
-        user_schema: Type[schemas.U],
-        user_update_schema: Type[schemas.UU],
         requires_verification: bool = False,
     ) -> APIRouter:
         """
         Return a router with routes to manage users.
 
-        :param user_schema: Pydantic schema of a public user.
-        :param user_update_schema: Pydantic schema for updating a user.
         :param requires_verification: Whether the endpoints
-        require the users to be verified or not. Defaults to False.
+        require the users to be verified or not.
         """
         return get_users_router(
             self.get_user_manager,
-            user_schema,
-            user_update_schema,
+            self._user_model,
+            self._user_update_model,
+            self._user_db_model,
             self.authenticator,
             requires_verification,
         )

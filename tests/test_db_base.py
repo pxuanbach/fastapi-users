@@ -1,20 +1,16 @@
-import uuid
-
 import pytest
 
 from fastapi_users.db import BaseUserDatabase
-from tests.conftest import IDType, OAuthAccountModel, UserModel
+from tests.conftest import UserDB
 
 
 @pytest.mark.asyncio
 @pytest.mark.db
-async def test_not_implemented_methods(
-    user: UserModel, oauth_account1: OAuthAccountModel
-):
-    base_user_db = BaseUserDatabase[UserModel, IDType]()
+async def test_not_implemented_methods(user):
+    base_user_db = BaseUserDatabase(UserDB)
 
     with pytest.raises(NotImplementedError):
-        await base_user_db.get(uuid.uuid4())
+        await base_user_db.get("aaa")
 
     with pytest.raises(NotImplementedError):
         await base_user_db.get_by_email("lancelot@camelot.bt")
@@ -23,16 +19,10 @@ async def test_not_implemented_methods(
         await base_user_db.get_by_oauth_account("google", "user_oauth1")
 
     with pytest.raises(NotImplementedError):
-        await base_user_db.create({})
+        await base_user_db.create(user)
 
     with pytest.raises(NotImplementedError):
-        await base_user_db.update(user, {})
+        await base_user_db.update(user)
 
     with pytest.raises(NotImplementedError):
         await base_user_db.delete(user)
-
-    with pytest.raises(NotImplementedError):
-        await base_user_db.add_oauth_account(user, {})
-
-    with pytest.raises(NotImplementedError):
-        await base_user_db.update_oauth_account(user, oauth_account1, {})

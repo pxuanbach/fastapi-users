@@ -5,25 +5,27 @@ You can add **FastAPI Users** to your FastAPI project in a few easy steps. First
 ## With SQLAlchemy support
 
 ```sh
-pip install 'fastapi-users[sqlalchemy]'
+pip install 'fastapi-users[sqlalchemy2]'
 ```
 
-
-## With Beanie support
+## With MongoDB support
 
 ```sh
-pip install 'fastapi-users[beanie]'
+pip install 'fastapi-users[mongodb]'
 ```
 
-## With Redis authentication backend support
+## With Tortoise ORM support
 
-Information on installing with proper database support can be found in the [Redis](configuration/authentication/strategies/redis.md) section.
+```sh
+pip install 'fastapi-users[tortoise-orm]'
+```
 
-## With OAuth2 support
+## With ormar support
 
-Information on installing with proper database support can be found in the [OAuth2](configuration/oauth.md) section.
-
+```sh
+pip install 'fastapi-users[ormar]'
+```
 
 ---
 
-That's it! In the next section, we'll have an [overview](./configuration/overview.md) of how things work.
+That's it! Now, let's have a look at our [User model](./configuration/models.md).

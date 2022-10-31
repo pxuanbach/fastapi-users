@@ -1,17 +1,5 @@
 import asyncio
-import dataclasses
-import uuid
-from typing import (
-    Any,
-    AsyncGenerator,
-    Callable,
-    Dict,
-    Generic,
-    List,
-    Optional,
-    Type,
-    Union,
-)
+from typing import Any, AsyncGenerator, Callable, Generic, Optional, Type, Union
 from unittest.mock import MagicMock
 
 import httpx
@@ -22,12 +10,17 @@ from httpx_oauth.oauth2 import OAuth2
 from pydantic import UUID4, SecretStr
 from pytest_mock import MockerFixture
 
-from fastapi_users import exceptions, models, schemas
+from fastapi_users import models
 from fastapi_users.authentication import AuthenticationBackend, BearerTransport
 from fastapi_users.authentication.strategy import Strategy
 from fastapi_users.db import BaseUserDatabase
 from fastapi_users.jwt import SecretType
-from fastapi_users.manager import BaseUserManager, UUIDIDMixin
+from fastapi_users.manager import (
+    BaseUserManager,
+    InvalidPasswordException,
+    UserNotExists,
+)
+from fastapi_users.models import BaseOAuthAccount, BaseOAuthAccountMixin
 from fastapi_users.openapi import OpenAPIResponseType
 from fastapi_users.password import PasswordHelper
 
@@ -39,76 +32,54 @@ lancelot_password_hash = password_helper.hash("lancelot")
 excalibur_password_hash = password_helper.hash("excalibur")
 
 
-IDType = uuid.UUID
-
-
-@dataclasses.dataclass
-class UserModel(models.UserProtocol[IDType]):
-    email: str
-    hashed_password: str
-    id: uuid.UUID = dataclasses.field(default_factory=uuid.uuid4)
-    is_active: bool = True
-    is_superuser: bool = False
-    is_verified: bool = False
-    first_name: Optional[str] = None
-
-
-@dataclasses.dataclass
-class OAuthAccountModel(models.OAuthAccountProtocol[IDType]):
-    oauth_name: str
-    access_token: str
-    account_id: str
-    account_email: str
-    id: uuid.UUID = dataclasses.field(default_factory=uuid.uuid4)
-    expires_at: Optional[int] = None
-    refresh_token: Optional[str] = None
-
-
-@dataclasses.dataclass
-class UserOAuthModel(UserModel):
-    oauth_accounts: List[OAuthAccountModel] = dataclasses.field(default_factory=list)
-
-
-class User(schemas.BaseUser[IDType]):
+class User(models.BaseUser):
     first_name: Optional[str]
 
 
-class UserCreate(schemas.BaseUserCreate):
+class UserCreate(models.BaseUserCreate):
     first_name: Optional[str]
 
 
-class UserUpdate(schemas.BaseUserUpdate):
+class UserUpdate(models.BaseUserUpdate):
     first_name: Optional[str]
 
 
-class UserOAuth(User, schemas.BaseOAuthAccountMixin):
+class UserDB(User, models.BaseUserDB):
+    pass
+
+
+class UserOAuth(User, BaseOAuthAccountMixin):
+    pass
+
+
+class UserDBOAuth(UserOAuth, UserDB):
     pass
 
 
 class BaseTestUserManager(
-    Generic[models.UP], UUIDIDMixin, BaseUserManager[models.UP, IDType]
+    Generic[models.UC, models.UD], BaseUserManager[models.UC, models.UD]
 ):
     reset_password_token_secret = "SECRET"
     verification_token_secret = "SECRET"
 
     async def validate_password(
-        self, password: str, user: Union[schemas.UC, models.UP]
+        self, password: str, user: Union[models.UC, models.UD]
     ) -> None:
         if len(password) < 3:
-            raise exceptions.InvalidPasswordException(
+            raise InvalidPasswordException(
                 reason="Password should be at least 3 characters"
             )
 
 
-class UserManager(BaseTestUserManager[UserModel]):
-    pass
+class UserManager(BaseTestUserManager[UserCreate, UserDB]):
+    user_db_model = UserDB
 
 
-class UserManagerOAuth(BaseTestUserManager[UserOAuthModel]):
-    pass
+class UserManagerOAuth(BaseTestUserManager[UserCreate, UserDBOAuth]):
+    user_db_model = UserDBOAuth
 
 
-class UserManagerMock(BaseTestUserManager[models.UP]):
+class UserManagerMock(UserManager):
     get_by_email: MagicMock
     request_verify: MagicMock
     verify: MagicMock
@@ -120,9 +91,6 @@ class UserManagerMock(BaseTestUserManager[models.UP]):
     on_after_forgot_password: MagicMock
     on_after_reset_password: MagicMock
     on_after_update: MagicMock
-    on_before_delete: MagicMock
-    on_after_delete: MagicMock
-    on_after_login: MagicMock
     _update: MagicMock
 
 
@@ -163,18 +131,16 @@ def secret(request) -> SecretType:
 
 
 @pytest.fixture
-def user() -> UserModel:
-    return UserModel(
+def user() -> UserDB:
+    return UserDB(
         email="king.arthur@camelot.bt",
         hashed_password=guinevere_password_hash,
     )
 
 
 @pytest.fixture
-def user_oauth(
-    oauth_account1: OAuthAccountModel, oauth_account2: OAuthAccountModel
-) -> UserOAuthModel:
-    return UserOAuthModel(
+def user_oauth(oauth_account1, oauth_account2) -> UserDBOAuth:
+    return UserDBOAuth(
         email="king.arthur@camelot.bt",
         hashed_password=guinevere_password_hash,
         oauth_accounts=[oauth_account1, oauth_account2],
@@ -182,8 +148,8 @@ def user_oauth(
 
 
 @pytest.fixture
-def inactive_user() -> UserModel:
-    return UserModel(
+def inactive_user() -> UserDB:
+    return UserDB(
         email="percival@camelot.bt",
         hashed_password=angharad_password_hash,
         is_active=False,
@@ -191,8 +157,8 @@ def inactive_user() -> UserModel:
 
 
 @pytest.fixture
-def inactive_user_oauth(oauth_account3: OAuthAccountModel) -> UserOAuthModel:
-    return UserOAuthModel(
+def inactive_user_oauth(oauth_account3) -> UserDBOAuth:
+    return UserDBOAuth(
         email="percival@camelot.bt",
         hashed_password=angharad_password_hash,
         is_active=False,
@@ -201,8 +167,8 @@ def inactive_user_oauth(oauth_account3: OAuthAccountModel) -> UserOAuthModel:
 
 
 @pytest.fixture
-def verified_user() -> UserModel:
-    return UserModel(
+def verified_user() -> UserDB:
+    return UserDB(
         email="lake.lady@camelot.bt",
         hashed_password=excalibur_password_hash,
         is_active=True,
@@ -211,8 +177,8 @@ def verified_user() -> UserModel:
 
 
 @pytest.fixture
-def verified_user_oauth(oauth_account4: OAuthAccountModel) -> UserOAuthModel:
-    return UserOAuthModel(
+def verified_user_oauth(oauth_account4) -> UserDBOAuth:
+    return UserDBOAuth(
         email="lake.lady@camelot.bt",
         hashed_password=excalibur_password_hash,
         is_active=False,
@@ -221,8 +187,8 @@ def verified_user_oauth(oauth_account4: OAuthAccountModel) -> UserOAuthModel:
 
 
 @pytest.fixture
-def superuser() -> UserModel:
-    return UserModel(
+def superuser() -> UserDB:
+    return UserDB(
         email="merlin@camelot.bt",
         hashed_password=viviane_password_hash,
         is_superuser=True,
@@ -230,8 +196,8 @@ def superuser() -> UserModel:
 
 
 @pytest.fixture
-def superuser_oauth() -> UserOAuthModel:
-    return UserOAuthModel(
+def superuser_oauth() -> UserDBOAuth:
+    return UserDBOAuth(
         email="merlin@camelot.bt",
         hashed_password=viviane_password_hash,
         is_superuser=True,
@@ -240,8 +206,8 @@ def superuser_oauth() -> UserOAuthModel:
 
 
 @pytest.fixture
-def verified_superuser() -> UserModel:
-    return UserModel(
+def verified_superuser() -> UserDB:
+    return UserDB(
         email="the.real.merlin@camelot.bt",
         hashed_password=viviane_password_hash,
         is_superuser=True,
@@ -250,8 +216,8 @@ def verified_superuser() -> UserModel:
 
 
 @pytest.fixture
-def verified_superuser_oauth() -> UserOAuthModel:
-    return UserOAuthModel(
+def verified_superuser_oauth() -> UserDBOAuth:
+    return UserDBOAuth(
         email="the.real.merlin@camelot.bt",
         hashed_password=viviane_password_hash,
         is_superuser=True,
@@ -261,8 +227,8 @@ def verified_superuser_oauth() -> UserOAuthModel:
 
 
 @pytest.fixture
-def oauth_account1() -> OAuthAccountModel:
-    return OAuthAccountModel(
+def oauth_account1() -> BaseOAuthAccount:
+    return BaseOAuthAccount(
         oauth_name="service1",
         access_token="TOKEN",
         expires_at=1579000751,
@@ -272,8 +238,8 @@ def oauth_account1() -> OAuthAccountModel:
 
 
 @pytest.fixture
-def oauth_account2() -> OAuthAccountModel:
-    return OAuthAccountModel(
+def oauth_account2() -> BaseOAuthAccount:
+    return BaseOAuthAccount(
         oauth_name="service2",
         access_token="TOKEN",
         expires_at=1579000751,
@@ -283,8 +249,8 @@ def oauth_account2() -> OAuthAccountModel:
 
 
 @pytest.fixture
-def oauth_account3() -> OAuthAccountModel:
-    return OAuthAccountModel(
+def oauth_account3() -> BaseOAuthAccount:
+    return BaseOAuthAccount(
         oauth_name="service3",
         access_token="TOKEN",
         expires_at=1579000751,
@@ -294,8 +260,8 @@ def oauth_account3() -> OAuthAccountModel:
 
 
 @pytest.fixture
-def oauth_account4() -> OAuthAccountModel:
-    return OAuthAccountModel(
+def oauth_account4() -> BaseOAuthAccount:
+    return BaseOAuthAccount(
         oauth_name="service4",
         access_token="TOKEN",
         expires_at=1579000751,
@@ -305,8 +271,8 @@ def oauth_account4() -> OAuthAccountModel:
 
 
 @pytest.fixture
-def oauth_account5() -> OAuthAccountModel:
-    return OAuthAccountModel(
+def oauth_account5() -> BaseOAuthAccount:
+    return BaseOAuthAccount(
         oauth_name="service5",
         access_token="TOKEN",
         expires_at=1579000751,
@@ -317,14 +283,10 @@ def oauth_account5() -> OAuthAccountModel:
 
 @pytest.fixture
 def mock_user_db(
-    user: UserModel,
-    verified_user: UserModel,
-    inactive_user: UserModel,
-    superuser: UserModel,
-    verified_superuser: UserModel,
-) -> BaseUserDatabase[UserModel, IDType]:
-    class MockUserDatabase(BaseUserDatabase[UserModel, IDType]):
-        async def get(self, id: UUID4) -> Optional[UserModel]:
+    user, verified_user, inactive_user, superuser, verified_superuser
+) -> BaseUserDatabase:
+    class MockUserDatabase(BaseUserDatabase[UserDB]):
+        async def get(self, id: UUID4) -> Optional[UserDB]:
             if id == user.id:
                 return user
             if id == verified_user.id:
@@ -337,7 +299,7 @@ def mock_user_db(
                 return verified_superuser
             return None
 
-        async def get_by_email(self, email: str) -> Optional[UserModel]:
+        async def get_by_email(self, email: str) -> Optional[UserDB]:
             lower_email = email.lower()
             if lower_email == user.email.lower():
                 return user
@@ -351,32 +313,28 @@ def mock_user_db(
                 return verified_superuser
             return None
 
-        async def create(self, create_dict: Dict[str, Any]) -> UserModel:
-            return UserModel(**create_dict)
-
-        async def update(
-            self, user: UserModel, update_dict: Dict[str, Any]
-        ) -> UserModel:
-            for field, value in update_dict.items():
-                setattr(user, field, value)
+        async def create(self, user: UserDB) -> UserDB:
             return user
 
-        async def delete(self, user: UserModel) -> None:
+        async def update(self, user: UserDB) -> UserDB:
+            return user
+
+        async def delete(self, user: UserDB) -> None:
             pass
 
-    return MockUserDatabase()
+    return MockUserDatabase(UserDB)
 
 
 @pytest.fixture
 def mock_user_db_oauth(
-    user_oauth: UserOAuthModel,
-    verified_user_oauth: UserOAuthModel,
-    inactive_user_oauth: UserOAuthModel,
-    superuser_oauth: UserOAuthModel,
-    verified_superuser_oauth: UserOAuthModel,
-) -> BaseUserDatabase[UserOAuthModel, IDType]:
-    class MockUserDatabase(BaseUserDatabase[UserOAuthModel, IDType]):
-        async def get(self, id: UUID4) -> Optional[UserOAuthModel]:
+    user_oauth,
+    verified_user_oauth,
+    inactive_user_oauth,
+    superuser_oauth,
+    verified_superuser_oauth,
+) -> BaseUserDatabase:
+    class MockUserDatabase(BaseUserDatabase[UserDBOAuth]):
+        async def get(self, id: UUID4) -> Optional[UserDBOAuth]:
             if id == user_oauth.id:
                 return user_oauth
             if id == verified_user_oauth.id:
@@ -389,7 +347,7 @@ def mock_user_db_oauth(
                 return verified_superuser_oauth
             return None
 
-        async def get_by_email(self, email: str) -> Optional[UserOAuthModel]:
+        async def get_by_email(self, email: str) -> Optional[UserDBOAuth]:
             lower_email = email.lower()
             if lower_email == user_oauth.email.lower():
                 return user_oauth
@@ -405,7 +363,7 @@ def mock_user_db_oauth(
 
         async def get_by_oauth_account(
             self, oauth: str, account_id: str
-        ) -> Optional[UserOAuthModel]:
+        ) -> Optional[UserDBOAuth]:
             user_oauth_account = user_oauth.oauth_accounts[0]
             if (
                 user_oauth_account.oauth_name == oauth
@@ -421,46 +379,16 @@ def mock_user_db_oauth(
                 return inactive_user_oauth
             return None
 
-        async def create(self, create_dict: Dict[str, Any]) -> UserOAuthModel:
-            return UserOAuthModel(**create_dict)
+        async def create(self, user: UserDBOAuth) -> UserDBOAuth:
+            return user_oauth
 
-        async def update(
-            self, user: UserOAuthModel, update_dict: Dict[str, Any]
-        ) -> UserOAuthModel:
-            for field, value in update_dict.items():
-                setattr(user, field, value)
-            return user
+        async def update(self, user: UserDBOAuth) -> UserDBOAuth:
+            return user_oauth
 
-        async def delete(self, user: UserOAuthModel) -> None:
+        async def delete(self, user: UserDBOAuth) -> None:
             pass
 
-        async def add_oauth_account(
-            self, user: UserOAuthModel, create_dict: Dict[str, Any]
-        ) -> UserOAuthModel:
-            oauth_account = OAuthAccountModel(**create_dict)
-            user.oauth_accounts.append(oauth_account)
-            return user
-
-        async def update_oauth_account(  # type: ignore
-            self,
-            user: UserOAuthModel,
-            oauth_account: OAuthAccountModel,
-            update_dict: Dict[str, Any],
-        ) -> UserOAuthModel:
-            for field, value in update_dict.items():
-                setattr(oauth_account, field, value)
-            updated_oauth_accounts = []
-            for existing_oauth_account in user.oauth_accounts:
-                if (
-                    existing_oauth_account.account_id == oauth_account.account_id
-                    and existing_oauth_account.oauth_name == oauth_account.oauth_name
-                ):
-                    updated_oauth_accounts.append(oauth_account)
-                else:
-                    updated_oauth_accounts.append(existing_oauth_account)
-            return user
-
-    return MockUserDatabase()
+    return MockUserDatabase(UserDBOAuth)
 
 
 @pytest.fixture
@@ -478,9 +406,6 @@ def make_user_manager(mocker: MockerFixture):
         mocker.spy(user_manager, "on_after_forgot_password")
         mocker.spy(user_manager, "on_after_reset_password")
         mocker.spy(user_manager, "on_after_update")
-        mocker.spy(user_manager, "on_before_delete")
-        mocker.spy(user_manager, "on_after_delete")
-        mocker.spy(user_manager, "on_after_login")
         mocker.spy(user_manager, "_update")
         return user_manager
 
@@ -525,22 +450,24 @@ class MockTransport(BearerTransport):
         return {}
 
 
-class MockStrategy(Strategy[UserModel, IDType]):
+class MockStrategy(Strategy[UserCreate, UserDB]):
     async def read_token(
-        self, token: Optional[str], user_manager: BaseUserManager[UserModel, IDType]
-    ) -> Optional[UserModel]:
+        self, token: Optional[str], user_manager: BaseUserManager[UserCreate, UserDB]
+    ) -> Optional[UserDB]:
         if token is not None:
             try:
-                parsed_id = user_manager.parse_id(token)
-                return await user_manager.get(parsed_id)
-            except (exceptions.InvalidID, exceptions.UserNotExists):
+                token_uuid = UUID4(token)
+                return await user_manager.get(token_uuid)
+            except ValueError:
+                return None
+            except UserNotExists:
                 return None
         return None
 
-    async def write_token(self, user: UserModel) -> str:
+    async def write_token(self, user: models.UD) -> str:
         return str(user.id)
 
-    async def destroy_token(self, token: str, user: UserModel) -> None:
+    async def destroy_token(self, token: str, user: models.UD) -> None:
         return None
 
 

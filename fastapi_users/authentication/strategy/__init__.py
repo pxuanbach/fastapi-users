@@ -3,9 +3,9 @@ from fastapi_users.authentication.strategy.base import (
     StrategyDestroyNotSupportedError,
 )
 from fastapi_users.authentication.strategy.db import (
-    AP,
+    A,
     AccessTokenDatabase,
-    AccessTokenProtocol,
+    BaseAccessToken,
     DatabaseStrategy,
 )
 from fastapi_users.authentication.strategy.jwt import JWTStrategy
@@ -16,9 +16,9 @@ except ImportError:  # pragma: no cover
     pass
 
 __all__ = [
-    "AP",
+    "A",
     "AccessTokenDatabase",
-    "AccessTokenProtocol",
+    "BaseAccessToken",
     "DatabaseStrategy",
     "JWTStrategy",
     "Strategy",

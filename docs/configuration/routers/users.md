@@ -5,22 +5,23 @@ This router provides routes to manage users. Check the [routes usage](../../usag
 ## Setup
 
 ```py
-import uuid
-
 from fastapi import FastAPI
 from fastapi_users import FastAPIUsers
 
-from .db import User
-from .schemas import UserRead, UserUpdate
+SECRET = "SECRET"
 
-fastapi_users = FastAPIUsers[User, uuid.UUID](
+fastapi_users = FastAPIUsers(
     get_user_manager,
     [auth_backend],
+    User,
+    UserCreate,
+    UserUpdate,
+    UserDB,
 )
 
 app = FastAPI()
 app.include_router(
-    fastapi_users.get_users_router(UserRead, UserUpdate),
+    fastapi_users.get_users_router(),
     prefix="/users",
     tags=["users"],
 )
@@ -32,7 +33,7 @@ You can require the user to be **verified** (i.e. `is_verified` property set to 
 
 ```py
 app.include_router(
-    fastapi_users.get_users_router(UserRead, UserUpdate, requires_verification=True),
+    fastapi_users.get_users_router(requires_verification=True),
     prefix="/users",
     tags=["users"],
 )

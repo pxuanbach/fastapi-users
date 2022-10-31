@@ -7,16 +7,18 @@ Check the [routes usage](../../usage/routes.md) to learn how to use them.
 ## Setup
 
 ```py
-import uuid
-
 from fastapi import FastAPI
 from fastapi_users import FastAPIUsers
 
-from .db import User
+SECRET = "SECRET"
 
-fastapi_users = FastAPIUsers[User, uuid.UUID](
+fastapi_users = FastAPIUsers(
     get_user_manager,
     [auth_backend],
+    User,
+    UserCreate,
+    UserUpdate,
+    UserDB,
 )
 
 app = FastAPI()

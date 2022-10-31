@@ -11,31 +11,33 @@ jobs:
         python_version: [3.7, 3.8, 3.9, '3.10']
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v1
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python_version }}
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install hatch
-        hatch env create
-    - name: Lint and typecheck
+        pip install flit
+        flit install --deps develop --extras oauth,redis
+    - name: Check codestyle
       run: |
-        hatch run lint-check
-    - name: Test
+        make format-check
+        make lint
+    - name: Typecheck
       run: |
-        hatch run test-cov-xml
-    - uses: codecov/codecov-action@v3
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        fail_ci_if_error: true
-        verbose: true
+        make typecheck
+    - name: Test with pytest
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      run: |
+        pytest --cov=fastapi_users/
+        codecov
     - name: Build and install it on system host
       run: |
-        hatch build
-        pip install dist/fastapi_users-*.whl
+        flit build --setup-py
+        flit install --deps none --python $(which python)
         python test_build.py
 
   release:
@@ -44,27 +46,19 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v1
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v1
       with:
         python-version: 3.7
     - name: Install dependencies
-      shell: bash
       run: |
         python -m pip install --upgrade pip
-        pip install hatch
-    - name: Build and publish on PyPI
+        pip install flit
+        flit install --deps develop --extras oauth,redis
+    - name: Release on PyPI
       env:
-        HATCH_INDEX_USER: ${{ secrets.HATCH_INDEX_USER }}
-        HATCH_INDEX_AUTH: ${{ secrets.HATCH_INDEX_AUTH }}
+        FLIT_USERNAME: ${{ secrets.FLIT_USERNAME }}
+        FLIT_PASSWORD: ${{ secrets.FLIT_PASSWORD }}
       run: |
-        hatch build
-        hatch publish
-    - name: Create release
-      uses: ncipollo/release-action@v1
-      with:
-        draft: true
-        body: ${{ github.event.head_commit.message }}
-        artifacts: dist/*.whl,dist/*.tar.gz
-        token: ${{ secrets.GITHUB_TOKEN }}
+        flit publish --setup-py

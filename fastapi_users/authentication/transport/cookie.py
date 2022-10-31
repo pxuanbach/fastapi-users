@@ -1,10 +1,4 @@
-import sys
 from typing import Any, Optional
-
-if sys.version_info < (3, 8):
-    from typing_extensions import Literal  # pragma: no cover
-else:
-    from typing import Literal  # pragma: no cover
 
 from fastapi import Response, status
 from fastapi.security import APIKeyCookie
@@ -24,7 +18,7 @@ class CookieTransport(Transport):
         cookie_domain: Optional[str] = None,
         cookie_secure: bool = True,
         cookie_httponly: bool = True,
-        cookie_samesite: Literal["lax", "strict", "none"] = "lax",
+        cookie_samesite: str = "lax",
     ):
         self.cookie_name = cookie_name
         self.cookie_max_age = cookie_max_age

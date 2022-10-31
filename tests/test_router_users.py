@@ -6,7 +6,7 @@ from fastapi import FastAPI, status
 
 from fastapi_users.authentication import Authenticator
 from fastapi_users.router import ErrorCode, get_users_router
-from tests.conftest import User, UserModel, UserUpdate, get_mock_authentication
+from tests.conftest import User, UserDB, UserUpdate, get_mock_authentication
 
 
 @pytest.fixture
@@ -21,6 +21,7 @@ def app_factory(get_user_manager, mock_authentication):
             get_user_manager,
             User,
             UserUpdate,
+            UserDB,
             authenticator,
             requires_verification=requires_verification,
         )
@@ -58,7 +59,7 @@ class TestMe:
     async def test_inactive_user(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        inactive_user: UserModel,
+        inactive_user: UserDB,
     ):
         client, _ = test_app_client
         response = await client.get(
@@ -69,7 +70,7 @@ class TestMe:
     async def test_active_user(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
+        user: UserDB,
     ):
         client, requires_verification = test_app_client
         response = await client.get(
@@ -86,7 +87,7 @@ class TestMe:
     async def test_verified_user(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        verified_user: UserModel,
+        verified_user: UserDB,
     ):
         client, _ = test_app_client
         response = await client.get(
@@ -115,7 +116,7 @@ class TestUpdateMe:
     async def test_inactive_user(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        inactive_user: UserModel,
+        inactive_user: UserDB,
     ):
         client, _ = test_app_client
         response = await client.patch(
@@ -126,8 +127,8 @@ class TestUpdateMe:
     async def test_existing_email(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
-        verified_user: UserModel,
+        user: UserDB,
+        verified_user: UserDB,
     ):
         client, requires_verification = test_app_client
         response = await client.patch(
@@ -145,7 +146,7 @@ class TestUpdateMe:
     async def test_invalid_password(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
+        user: UserDB,
     ):
         client, requires_verification = test_app_client
         response = await client.patch(
@@ -166,7 +167,7 @@ class TestUpdateMe:
     async def test_empty_body(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
+        user: UserDB,
     ):
         client, requires_verification = test_app_client
         response = await client.patch(
@@ -183,7 +184,7 @@ class TestUpdateMe:
     async def test_valid_body(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
+        user: UserDB,
     ):
         client, requires_verification = test_app_client
         json = {"email": "king.arthur@tintagel.bt"}
@@ -201,7 +202,7 @@ class TestUpdateMe:
     async def test_unverified_after_email_change(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        verified_user: UserModel,
+        verified_user: UserDB,
     ):
         client, _ = test_app_client
         json = {"email": "king.arthur@tintagel.bt"}
@@ -216,7 +217,7 @@ class TestUpdateMe:
     async def test_valid_body_is_superuser(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
+        user: UserDB,
     ):
         client, requires_verification = test_app_client
         json = {"is_superuser": True}
@@ -234,7 +235,7 @@ class TestUpdateMe:
     async def test_valid_body_is_active(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
+        user: UserDB,
     ):
         client, requires_verification = test_app_client
         json = {"is_active": False}
@@ -252,7 +253,7 @@ class TestUpdateMe:
     async def test_valid_body_is_verified(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
+        user: UserDB,
     ):
         client, requires_verification = test_app_client
         json = {"is_verified": True}
@@ -272,7 +273,7 @@ class TestUpdateMe:
         mocker,
         mock_user_db,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
+        user: UserDB,
     ):
         client, requires_verification = test_app_client
         mocker.spy(mock_user_db, "update")
@@ -294,7 +295,7 @@ class TestUpdateMe:
     async def test_empty_body_verified_user(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        verified_user: UserModel,
+        verified_user: UserDB,
     ):
         client, _ = test_app_client
         response = await client.patch(
@@ -308,7 +309,7 @@ class TestUpdateMe:
     async def test_valid_body_verified_user(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        verified_user: UserModel,
+        verified_user: UserDB,
     ):
         client, _ = test_app_client
         json = {"email": "king.arthur@tintagel.bt"}
@@ -323,7 +324,7 @@ class TestUpdateMe:
     async def test_valid_body_is_superuser_verified_user(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        verified_user: UserModel,
+        verified_user: UserDB,
     ):
         client, _ = test_app_client
         json = {"is_superuser": True}
@@ -338,7 +339,7 @@ class TestUpdateMe:
     async def test_valid_body_is_active_verified_user(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        verified_user: UserModel,
+        verified_user: UserDB,
     ):
         client, _ = test_app_client
         json = {"is_active": False}
@@ -353,7 +354,7 @@ class TestUpdateMe:
     async def test_valid_body_is_verified_verified_user(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        verified_user: UserModel,
+        verified_user: UserDB,
     ):
         client, _ = test_app_client
         json = {"is_verified": False}
@@ -370,7 +371,7 @@ class TestUpdateMe:
         mocker,
         mock_user_db,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        verified_user: UserModel,
+        verified_user: UserDB,
     ):
         client, _ = test_app_client
         mocker.spy(mock_user_db, "update")
@@ -398,7 +399,7 @@ class TestGetUser:
     async def test_regular_user(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
+        user: UserDB,
     ):
         client, requires_verification = test_app_client
         response = await client.get(
@@ -411,7 +412,7 @@ class TestGetUser:
     async def test_verified_user(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        verified_user: UserModel,
+        verified_user: UserDB,
     ):
         client, _ = test_app_client
         response = await client.get(
@@ -423,7 +424,7 @@ class TestGetUser:
     async def test_not_existing_user_unverified_superuser(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        superuser: UserModel,
+        superuser: UserDB,
     ):
         client, requires_verification = test_app_client
         response = await client.get(
@@ -438,7 +439,7 @@ class TestGetUser:
     async def test_not_existing_user_verified_superuser(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        verified_superuser: UserModel,
+        verified_superuser: UserDB,
     ):
         client, _ = test_app_client
         response = await client.get(
@@ -450,8 +451,8 @@ class TestGetUser:
     async def test_superuser(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
-        superuser: UserModel,
+        user: UserDB,
+        superuser: UserDB,
     ):
         client, requires_verification = test_app_client
         response = await client.get(
@@ -469,8 +470,8 @@ class TestGetUser:
     async def test_verified_superuser(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
-        verified_superuser: UserModel,
+        user: UserDB,
+        verified_superuser: UserDB,
     ):
         client, _ = test_app_client
         response = await client.get(
@@ -482,7 +483,7 @@ class TestGetUser:
         assert data["id"] == str(user.id)
         assert "hashed_password" not in data
 
-    async def test_get_user_namespace(self, app_factory, user: UserModel):
+    async def test_get_user_namespace(self, app_factory, user: UserDB):
         assert app_factory(True).url_path_for("users:user", id=user.id) == f"/{user.id}"
 
 
@@ -497,7 +498,7 @@ class TestUpdateUser:
     async def test_regular_user(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
+        user: UserDB,
     ):
         client, requires_verification = test_app_client
         response = await client.patch(
@@ -510,7 +511,7 @@ class TestUpdateUser:
     async def test_verified_user(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        verified_user: UserModel,
+        verified_user: UserDB,
     ):
         client, _ = test_app_client
         response = await client.patch(
@@ -522,7 +523,7 @@ class TestUpdateUser:
     async def test_not_existing_user_unverified_superuser(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        superuser: UserModel,
+        superuser: UserDB,
     ):
         client, requires_verification = test_app_client
         response = await client.patch(
@@ -538,7 +539,7 @@ class TestUpdateUser:
     async def test_not_existing_user_verified_superuser(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        verified_superuser: UserModel,
+        verified_superuser: UserDB,
     ):
         client, _ = test_app_client
         response = await client.patch(
@@ -551,8 +552,8 @@ class TestUpdateUser:
     async def test_empty_body_unverified_superuser(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
-        superuser: UserModel,
+        user: UserDB,
+        superuser: UserDB,
     ):
         client, requires_verification = test_app_client
         response = await client.patch(
@@ -569,8 +570,8 @@ class TestUpdateUser:
     async def test_empty_body_verified_superuser(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
-        verified_superuser: UserModel,
+        user: UserDB,
+        verified_superuser: UserDB,
     ):
         client, _ = test_app_client
         response = await client.patch(
@@ -586,8 +587,8 @@ class TestUpdateUser:
     async def test_valid_body_unverified_superuser(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
-        superuser: UserModel,
+        user: UserDB,
+        superuser: UserDB,
     ):
         client, requires_verification = test_app_client
         json = {"email": "king.arthur@tintagel.bt"}
@@ -607,9 +608,9 @@ class TestUpdateUser:
     async def test_existing_email_verified_superuser(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
-        verified_user: UserModel,
-        verified_superuser: UserModel,
+        user: UserDB,
+        verified_user: UserDB,
+        verified_superuser: UserDB,
     ):
         client, _ = test_app_client
         response = await client.patch(
@@ -624,8 +625,8 @@ class TestUpdateUser:
     async def test_invalid_password_verified_superuser(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
-        verified_superuser: UserModel,
+        user: UserDB,
+        verified_superuser: UserDB,
     ):
         client, _ = test_app_client
         response = await client.patch(
@@ -643,8 +644,8 @@ class TestUpdateUser:
     async def test_valid_body_verified_superuser(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
-        verified_superuser: UserModel,
+        user: UserDB,
+        verified_superuser: UserDB,
     ):
         client, _ = test_app_client
         json = {"email": "king.arthur@tintagel.bt"}
@@ -661,8 +662,8 @@ class TestUpdateUser:
     async def test_valid_body_is_superuser_unverified_superuser(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
-        superuser: UserModel,
+        user: UserDB,
+        superuser: UserDB,
     ):
         client, requires_verification = test_app_client
         json = {"is_superuser": True}
@@ -682,8 +683,8 @@ class TestUpdateUser:
     async def test_valid_body_is_superuser_verified_superuser(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
-        verified_superuser: UserModel,
+        user: UserDB,
+        verified_superuser: UserDB,
     ):
         client, _ = test_app_client
         json = {"is_superuser": True}
@@ -700,8 +701,8 @@ class TestUpdateUser:
     async def test_valid_body_is_active_unverified_superuser(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
-        superuser: UserModel,
+        user: UserDB,
+        superuser: UserDB,
     ):
         client, requires_verification = test_app_client
         json = {"is_active": False}
@@ -721,8 +722,8 @@ class TestUpdateUser:
     async def test_valid_body_is_active_verified_superuser(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
-        verified_superuser: UserModel,
+        user: UserDB,
+        verified_superuser: UserDB,
     ):
         client, _ = test_app_client
         json = {"is_active": False}
@@ -739,8 +740,8 @@ class TestUpdateUser:
     async def test_valid_body_is_verified_unverified_superuser(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
-        superuser: UserModel,
+        user: UserDB,
+        superuser: UserDB,
     ):
         client, requires_verification = test_app_client
         json = {"is_verified": True}
@@ -760,8 +761,8 @@ class TestUpdateUser:
     async def test_valid_body_is_verified_verified_superuser(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
-        verified_superuser: UserModel,
+        user: UserDB,
+        verified_superuser: UserDB,
     ):
         client, _ = test_app_client
         json = {"is_verified": True}
@@ -780,8 +781,8 @@ class TestUpdateUser:
         mocker,
         mock_user_db,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
-        superuser: UserModel,
+        user: UserDB,
+        superuser: UserDB,
     ):
         client, requires_verification = test_app_client
         mocker.spy(mock_user_db, "update")
@@ -807,8 +808,8 @@ class TestUpdateUser:
         mocker,
         mock_user_db,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
-        verified_superuser: UserModel,
+        user: UserDB,
+        verified_superuser: UserDB,
     ):
         client, _ = test_app_client
         mocker.spy(mock_user_db, "update")
@@ -838,7 +839,7 @@ class TestDeleteUser:
     async def test_regular_user(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
+        user: UserDB,
     ):
         client, requires_verification = test_app_client
         response = await client.delete(
@@ -851,7 +852,7 @@ class TestDeleteUser:
     async def test_verified_user(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        verified_user: UserModel,
+        verified_user: UserDB,
     ):
         client, _ = test_app_client
         response = await client.delete(
@@ -863,7 +864,7 @@ class TestDeleteUser:
     async def test_not_existing_user_unverified_superuser(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        superuser: UserModel,
+        superuser: UserDB,
     ):
         client, requires_verification = test_app_client
         response = await client.delete(
@@ -878,7 +879,7 @@ class TestDeleteUser:
     async def test_not_existing_user_verified_superuser(
         self,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        verified_superuser: UserModel,
+        verified_superuser: UserDB,
     ):
         client, _ = test_app_client
         response = await client.delete(
@@ -892,8 +893,8 @@ class TestDeleteUser:
         mocker,
         mock_user_db,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
-        superuser: UserModel,
+        user: UserDB,
+        superuser: UserDB,
     ):
         client, requires_verification = test_app_client
         mocker.spy(mock_user_db, "delete")
@@ -916,8 +917,8 @@ class TestDeleteUser:
         mocker,
         mock_user_db,
         test_app_client: Tuple[httpx.AsyncClient, bool],
-        user: UserModel,
-        verified_superuser: UserModel,
+        user: UserDB,
+        verified_superuser: UserDB,
     ):
         client, _ = test_app_client
         mocker.spy(mock_user_db, "delete")

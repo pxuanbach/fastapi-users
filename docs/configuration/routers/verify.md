@@ -8,22 +8,23 @@ This router provides routes to manage user email verification. Check the [routes
 ## Setup
 
 ```py
-import uuid
-
 from fastapi import FastAPI
 from fastapi_users import FastAPIUsers
 
-from .db import User
-from .schemas import UserRead
+SECRET = "SECRET"
 
-fastapi_users = FastAPIUsers[User, uuid.UUID](
+fastapi_users = FastAPIUsers(
     get_user_manager,
     [auth_backend],
+    User,
+    UserCreate,
+    UserUpdate,
+    UserDB,
 )
 
 app = FastAPI()
 app.include_router(
-    fastapi_users.get_verify_router(UserRead),
+    fastapi_users.get_verify_router(),
     prefix="/auth",
     tags=["auth"],
 )

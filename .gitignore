@@ -112,3 +112,7 @@ ENV/
 
 # .idea
 .idea/
+
+.github
+docs/
+docs-overrides/
